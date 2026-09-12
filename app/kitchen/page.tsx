@@ -1,0 +1,211 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { Session } from '@supabase/supabase-js';
+import { supabaseBrowser } from '@/lib/supabase-browser';
+import { formatKsh } from '@/lib/format';
+
+type OrderStatus = 'paid' | 'preparing' | 'ready' | 'completed';
+
+interface KitchenOrderItem {
+  id: string;
+  quantity: number;
+  size: 'single' | 'double' | null;
+  notes: string | null;
+  menu_items: { name: string } | null;
+}
+
+interface KitchenOrder {
+  id: string;
+  order_number: number;
+  status: OrderStatus;
+  total_amount: number;
+  customer_name: string | null;
+  customer_phone: string | null;
+  created_at: string;
+  order_items: KitchenOrderItem[];
+}
+
+interface KitchenMenuItem {
+  id: string;
+  name: string;
+  is_available: boolean;
+}
+
+const STATUS_LABEL: Record<OrderStatus, string> = {
+  paid: 'Nouvelle',
+  preparing: 'En préparation',
+  ready: 'Prête',
+  completed: 'Terminée',
+};
+
+const NEXT_ACTION: Partial<Record<OrderStatus, { label: string; next: OrderStatus }>> = {
+  paid: { label: 'Commencer la préparation', next: 'preparing' },
+  preparing: { label: 'Marquer prête', next: 'ready' },
+  ready: { label: 'Marquer servie', next: 'completed' },
+};
+
+export default function KitchenPage() {
+  const router = useRouter();
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [orders, setOrders] = useState<KitchenOrder[]>([]);
+  const [menuItems, setMenuItems] = useState<KitchenMenuItem[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadOrders = useCallback(async () => {
+    const { data, error } = await supabaseBrowser
+      .from('orders')
+      .select(
+        'id, order_number, status, total_amount, customer_name, customer_phone, created_at, order_items(id, quantity, size, notes, menu_items(name))'
+      )
+      .in('status', ['paid', 'preparing', 'ready'])
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      setLoadError(error.message);
+      return;
+    }
+    setLoadError(null);
+    setOrders((data ?? []) as unknown as KitchenOrder[]);
+  }, []);
+
+  const loadMenuItems = useCallback(async () => {
+    const { data, error } = await supabaseBrowser
+      .from('menu_items')
+      .select('id, name, is_available')
+      .order('sort_order', { ascending: true });
+    if (!error) setMenuItems((data ?? []) as KitchenMenuItem[]);
+  }, []);
+
+  useEffect(() => {
+    supabaseBrowser.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabaseBrowser.auth.onAuthStateChange((_event, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (session === null) router.replace('/login');
+  }, [session, router]);
+
+  useEffect(() => {
+    if (!session) return;
+    loadOrders();
+    loadMenuItems();
+
+    const channel = supabaseBrowser
+      .channel('kitchen-dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => loadOrders())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => loadOrders())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, () => loadMenuItems())
+      .subscribe();
+
+    return () => {
+      supabaseBrowser.removeChannel(channel);
+    };
+  }, [session, loadOrders, loadMenuItems]);
+
+  async function advanceStatus(orderId: string, next: OrderStatus) {
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: next } : o)));
+    const { error } = await supabaseBrowser.from('orders').update({ status: next }).eq('id', orderId);
+    if (error) loadOrders();
+  }
+
+  async function toggleAvailability(item: KitchenMenuItem) {
+    setMenuItems((prev) =>
+      prev.map((m) => (m.id === item.id ? { ...m, is_available: !m.is_available } : m))
+    );
+    const { error } = await supabaseBrowser
+      .from('menu_items')
+      .update({ is_available: !item.is_available })
+      .eq('id', item.id);
+    if (error) loadMenuItems();
+  }
+
+  async function handleLogout() {
+    await supabaseBrowser.auth.signOut();
+    router.replace('/login');
+  }
+
+  if (session === undefined) {
+    return <div className="p-6 text-center text-ink/60">Chargement…</div>;
+  }
+  if (!session) {
+    return null;
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl px-4 pb-24 pt-6">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="font-display text-2xl text-forest">Commandes</h1>
+        <button onClick={handleLogout} className="text-sm text-ink/60 underline">
+          Déconnexion
+        </button>
+      </div>
+
+      {loadError && <p className="mb-4 text-sm text-red-600">{loadError}</p>}
+
+      {orders.length === 0 && (
+        <p className="text-ink/60">Aucune commande en cours pour le moment.</p>
+      )}
+
+      <div className="flex flex-col gap-4">
+        {orders.map((order) => {
+          const action = NEXT_ACTION[order.status];
+          return (
+            <div key={order.id} className="rounded-xl border border-ink/10 bg-white p-4 shadow-sm">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-display text-lg text-forest">
+                  Commande #{order.order_number}
+                </span>
+                <span className="rounded-full bg-cream px-3 py-1 text-xs font-medium text-espresso">
+                  {STATUS_LABEL[order.status]}
+                </span>
+              </div>
+              {order.customer_name && (
+                <p className="mb-2 text-sm text-ink/70">Client : {order.customer_name}</p>
+              )}
+              <ul className="mb-3 flex flex-col gap-1 text-sm text-ink">
+                {order.order_items.map((line) => (
+                  <li key={line.id}>
+                    {line.quantity}× {line.menu_items?.name ?? 'Article'}
+                    {line.size ? ` (${line.size === 'single' ? 'simple' : 'double'})` : ''}
+                    {line.notes ? ` — ${line.notes}` : ''}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-ink">{formatKsh(order.total_amount)}</span>
+                {action && (
+                  <button
+                    onClick={() => advanceStatus(order.id, action.next)}
+                    className="rounded-lg bg-forest px-4 py-2 text-sm font-medium text-cream"
+                  >
+                    {action.label}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <h2 className="mb-3 mt-10 font-display text-xl text-forest">Disponibilité du menu</h2>
+      <div className="flex flex-col divide-y divide-ink/10 rounded-xl border border-ink/10 bg-white">
+        {menuItems.map((item) => (
+          <label key={item.id} className="flex items-center justify-between px-4 py-3">
+            <span className={item.is_available ? 'text-ink' : 'text-ink/40 line-through'}>
+              {item.name}
+            </span>
+            <input
+              type="checkbox"
+              checked={item.is_available}
+              onChange={() => toggleAvailability(item)}
+              className="h-5 w-5 accent-forest"
+            />
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
