@@ -28,31 +28,23 @@ export default async function OrderConfirmationPage({ params }: { params: { id: 
       <p className="mt-2 text-espresso">
         Order <span className="font-display text-2xl text-ink">#{order.order_number}</span>
       </p>
-      <OrderStatusBanner orderId={order.id} initialStatus={order.status as OrderStatus} />
-
-      <p className="mt-3 text-xs text-espresso/60">
-        Keep this page open — we'll let you know right here when it's ready.
-      </p>
-
-      <div className="mt-6 space-y-2 rounded-xl border border-espresso/15 bg-white p-4 text-left">
-        {(items ?? []).map((item: any) => (
-          <div key={item.id} className="flex justify-between text-sm">
-            <span className="text-ink">
-              {item.quantity} × {item.menu_items?.name}
-              {item.size ? ` (${item.size})` : ''}
-            </span>
-            <span className="text-espresso">{formatKsh(item.unit_price * item.quantity)}</span>
+      <OrderStatusBanner orderId={order.id} initialStatus={order.status as OrderStatus}>
+        <div className="mt-6 space-y-2 rounded-xl border border-espresso/15 bg-white p-4 text-left">
+          {(items ?? []).map((item: any) => (
+            <div key={item.id} className="flex justify-between text-sm">
+              <span className="text-ink">
+                {item.quantity} × {item.menu_items?.name}
+                {item.size ? ` (${item.size})` : ''}
+              </span>
+              <span className="text-espresso">{formatKsh(item.unit_price * item.quantity)}</span>
+            </div>
+          ))}
+          <div className="flex justify-between border-t border-espresso/10 pt-2 font-medium">
+            <span>Total</span>
+            <span>{formatKsh(order.total_amount)}</span>
           </div>
-        ))}
-        <div className="flex justify-between border-t border-espresso/10 pt-2 font-medium">
-          <span>Total</span>
-          <span>{formatKsh(order.total_amount)}</span>
         </div>
-      </div>
-
-      <a href="/" className="mt-8 inline-block text-forest underline">
-        Back to menu
-      </a>
+      </OrderStatusBanner>
     </div>
   );
 }
