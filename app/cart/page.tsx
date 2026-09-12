@@ -30,7 +30,9 @@ export default function CartPage() {
                   </p>
                   {line.modifiers.length > 0 && (
                     <p className="mt-0.5 text-sm text-espresso">
-                      {line.modifiers.map((m) => m.name).join(', ')}
+                      {line.modifiers
+                        .map((m) => (m.price > 0 ? `${m.name} (+${formatKsh(m.price)})` : m.name))
+                        .join(', ')}
                     </p>
                   )}
                 </div>
