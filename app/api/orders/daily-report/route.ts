@@ -87,33 +87,34 @@ export async function GET(req: NextRequest) {
     .fontSize(12)
     .font('Helvetica')
     .fillColor('#6B4A31')
-    .text(`Récapitulatif du ${label}`, { align: 'center' });
+    .text(`Daily recap — ${label}`, { align: 'center' });
   doc.moveDown(1.5);
   doc.fillColor('#000000');
 
   if (rows.length === 0) {
-    doc.fontSize(12).text("Aucune commande enregistrée aujourd'hui.");
+    doc.fontSize(12).text('No orders recorded today.');
   } else {
     rows.forEach((o) => {
-      const time = new Date(o.created_at).toLocaleTimeString('fr-FR', {
+      const time = new Date(o.created_at).toLocaleTimeString('en-GB', {
         hour: '2-digit',
         minute: '2-digit',
+        hour12: false,
         timeZone: 'Africa/Nairobi',
       });
       const itemsLine =
         (o.order_items ?? [])
           .map((it) => {
-            const sizeLabel = it.size ? ` (${it.size === 'single' ? 'simple' : 'double'})` : '';
-            return `${it.quantity}× ${it.menu_items?.name ?? 'Article'}${sizeLabel}`;
+            const sizeLabel = it.size ? ` (${it.size === 'single' ? 'single' : 'double'})` : '';
+            return `${it.quantity}× ${it.menu_items?.name ?? 'Item'}${sizeLabel}`;
           })
           .join(', ') || '—';
 
       doc
         .fontSize(11)
         .font('Helvetica-Bold')
-        .text(`#${o.order_number} — ${time} — ${o.customer_name ?? 'Client'}`);
+        .text(`#${o.order_number} — ${time} — ${o.customer_name ?? 'Customer'}`);
       doc.fontSize(10).font('Helvetica').text(itemsLine);
-      doc.text(`Montant : ${formatKsh(o.total_amount)}`);
+      doc.text(`Amount: ${formatKsh(o.total_amount)}`);
       doc.moveDown(0.6);
     });
   }
@@ -128,8 +129,8 @@ export async function GET(req: NextRequest) {
   doc.moveDown(0.8);
 
   doc.fontSize(13).font('Helvetica-Bold').fillColor('#1F3B2E');
-  doc.text(`Nombre de commandes : ${rows.length}`);
-  doc.text(`Chiffre d'affaires total : ${formatKsh(total)}`);
+  doc.text(`Number of orders: ${rows.length}`);
+  doc.text(`Total revenue: ${formatKsh(total)}`);
 
   doc.end();
   const pdfBuffer = await done;
