@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { OrderStatus } from '@/lib/types';
+import { playReadyChime, vibrate } from '@/lib/notify';
 
 const STATUS_COPY: Record<OrderStatus, { title: string; subtitle: string }> = {
   paid: {
@@ -21,33 +22,6 @@ const STATUS_COPY: Record<OrderStatus, { title: string; subtitle: string }> = {
     subtitle: 'Thanks for stopping by!',
   },
 };
-
-// Two short beeps synthesized with the Web Audio API — no audio file to host,
-// and it still works even if the tab has no <audio> element.
-function playChime() {
-  try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
-    const now = ctx.currentTime;
-    [880, 1175].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      const start = now + i * 0.18;
-      gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(0.35, start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.35);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + 0.4);
-    });
-  } catch {
-    // Audio isn't critical to the notification — fail silently.
-  }
-}
 
 export default function OrderStatusBanner({
   orderId,
@@ -92,10 +66,8 @@ export default function OrderStatusBanner({
 
   useEffect(() => {
     if (status === 'ready' && prevStatusRef.current !== 'ready') {
-      playChime();
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate([200, 100, 200]);
-      }
+      playReadyChime();
+      vibrate([200, 100, 200]);
       document.title = `✅ Order ready! — ${originalTitleRef.current}`;
     }
     prevStatusRef.current = status;
