@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabase-server';
 import { formatKsh } from '@/lib/format';
+import OrderStatusBanner from '@/components/OrderStatusBanner';
+import type { OrderStatus } from '@/lib/types';
 
 export const revalidate = 0;
 
@@ -26,8 +28,10 @@ export default async function OrderConfirmationPage({ params }: { params: { id: 
       <p className="mt-2 text-espresso">
         Order <span className="font-display text-2xl text-ink">#{order.order_number}</span>
       </p>
-      <p className="mt-1 text-sm text-espresso/70">
-        We&apos;ll call your number when it&apos;s ready — show this screen at the counter.
+      <OrderStatusBanner orderId={order.id} initialStatus={order.status as OrderStatus} />
+
+      <p className="mt-3 text-xs text-espresso/60">
+        Keep this page open — we'll let you know right here when it's ready.
       </p>
 
       <div className="mt-6 space-y-2 rounded-xl border border-espresso/15 bg-white p-4 text-left">
