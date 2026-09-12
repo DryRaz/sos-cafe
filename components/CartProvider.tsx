@@ -32,7 +32,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) setLines(JSON.parse(raw));
     } catch {
-      // stockage corrompu ou indisponible
+      // storage corrupted or unavailable
     }
     setHydrated(true);
   }, []);
@@ -76,6 +76,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
 export function useCart() {
   const ctx = useContext(CartContext);
-  if (!ctx) throw new Error('useCart doit être utilisé à l’intérieur de CartProvider');
+  if (!ctx) throw new Error('useCart must be used within a CartProvider');
   return ctx;
 }
