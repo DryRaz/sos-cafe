@@ -9,7 +9,12 @@ export default function CartBar() {
   const { count, total } = useCart();
   const pathname = usePathname();
 
-  const hideOn = pathname === '/cart' || pathname === '/checkout' || pathname.startsWith('/order/');
+  const hideOn =
+    pathname === '/cart' ||
+    pathname === '/checkout' ||
+    pathname.startsWith('/order/') ||
+    pathname === '/login' ||
+    pathname.startsWith('/kitchen');
   if (count === 0 || hideOn) return null;
 
   return (
