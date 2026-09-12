@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Session } from '@supabase/supabase-js';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 import { formatKsh } from '@/lib/format';
-
-type OrderStatus = 'paid' | 'preparing' | 'ready' | 'completed';
+import { playNewOrderChime, vibrate } from '@/lib/notify';
+import type { OrderStatus } from '@/lib/types';
 
 interface KitchenOrderItem {
   id: string;
@@ -52,6 +52,11 @@ export default function KitchenPage() {
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [menuItems, setMenuItems] = useState<KitchenMenuItem[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [newOrderAlert, setNewOrderAlert] = useState<{ orderId: string; orderNumber: number } | null>(
+    null
+  );
+  const alertTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const originalTitleRef = useRef('');
 
   const loadOrders = useCallback(async () => {
     const { data, error } = await supabaseBrowser
@@ -84,6 +89,34 @@ export default function KitchenPage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Reset the flashed tab title once the barista actually looks back at the
+  // dashboard, rather than leaving it changed forever.
+  useEffect(() => {
+    originalTitleRef.current = document.title;
+    const onVisible = () => {
+      if (!document.hidden) document.title = originalTitleRef.current;
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
+  const notifyNewOrder = useCallback((orderId: string, orderNumber: number) => {
+    playNewOrderChime();
+    vibrate([150, 80, 150, 80, 150]);
+    if (document.hidden) {
+      document.title = `🔔 Nouvelle commande — ${originalTitleRef.current}`;
+    }
+    setNewOrderAlert({ orderId, orderNumber });
+    if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
+    alertTimeoutRef.current = setTimeout(() => setNewOrderAlert(null), 6000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     if (session === null) router.replace('/login');
   }, [session, router]);
@@ -95,7 +128,15 @@ export default function KitchenPage() {
 
     const channel = supabaseBrowser
       .channel('kitchen-dashboard')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => loadOrders())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+        loadOrders();
+        const newOrder = payload.new as { id?: string; order_number?: number } | null;
+        if (newOrder?.id && newOrder.order_number) {
+          notifyNewOrder(newOrder.id, newOrder.order_number);
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadOrders())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, () => loadOrders())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => loadOrders())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, () => loadMenuItems())
       .subscribe();
@@ -143,6 +184,20 @@ export default function KitchenPage() {
         </button>
       </div>
 
+      {newOrderAlert && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-gold bg-gold/15 px-4 py-3">
+          <p className="font-display text-base text-espresso">
+            🔔 Nouvelle commande #{newOrderAlert.orderNumber} !
+          </p>
+          <button
+            onClick={() => setNewOrderAlert(null)}
+            className="rounded-lg bg-gold px-3 py-1 text-sm font-medium text-ink"
+          >
+            OK
+          </button>
+        </div>
+      )}
+
       {loadError && <p className="mb-4 text-sm text-red-600">{loadError}</p>}
 
       {orders.length === 0 && (
@@ -153,7 +208,14 @@ export default function KitchenPage() {
         {orders.map((order) => {
           const action = NEXT_ACTION[order.status];
           return (
-            <div key={order.id} className="rounded-xl border border-ink/10 bg-white p-4 shadow-sm">
+            <div
+              key={order.id}
+              className={`rounded-xl border bg-white p-4 shadow-sm ${
+                newOrderAlert?.orderId === order.id
+                  ? 'border-gold ring-2 ring-gold'
+                  : 'border-ink/10'
+              }`}
+            >
               <div className="mb-2 flex items-center justify-between">
                 <span className="font-display text-lg text-forest">
                   Commande #{order.order_number}
