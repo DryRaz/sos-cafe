@@ -1,5 +1,7 @@
 export type DrinkSize = 'single' | 'double';
 
+export type OrderStatus = 'paid' | 'preparing' | 'ready' | 'completed';
+
 export interface Modifier {
   id: string;
   name: string;
