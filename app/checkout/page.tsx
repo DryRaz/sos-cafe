@@ -65,6 +65,34 @@ export default function CheckoutPage() {
         Test mode — this confirms your order without taking payment yet.
       </p>
 
+      <div className="mt-5 space-y-3">
+        <h2 className="text-sm font-medium text-espresso">Order summary</h2>
+        {lines.map((line) => (
+          <div key={line.key} className="rounded-xl border border-espresso/15 bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium text-ink">
+                  {line.quantity}× {line.name}
+                  {line.size ? ` (${line.size})` : ''}
+                </p>
+                {line.modifiers.length > 0 && (
+                  <p className="mt-0.5 text-sm text-espresso">
+                    {line.modifiers
+                      .map((m) => (m.price > 0 ? `${m.name} (+${formatKsh(m.price)})` : m.name))
+                      .join(', ')}
+                  </p>
+                )}
+              </div>
+              <span className="whitespace-nowrap font-medium text-ink">
+                {formatKsh(
+                  (line.unit_price + line.modifiers.reduce((s, m) => s + m.price, 0)) * line.quantity
+                )}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
           <label className="mb-1.5 block text-sm text-espresso" htmlFor="phone">
