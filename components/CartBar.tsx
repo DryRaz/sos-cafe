@@ -14,6 +14,7 @@ export default function CartBar() {
     pathname === '/checkout' ||
     pathname.startsWith('/order/') ||
     pathname === '/login' ||
+    pathname === '/reset-password' ||
     pathname.startsWith('/kitchen');
   if (count === 0 || hideOn) return null;
 
