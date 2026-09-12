@@ -55,6 +55,8 @@ export default function KitchenPage() {
   const [newOrderAlert, setNewOrderAlert] = useState<{ orderId: string; orderNumber: number } | null>(
     null
   );
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
   const alertTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const originalTitleRef = useRef('');
 
@@ -168,6 +170,45 @@ export default function KitchenPage() {
     router.replace('/login');
   }
 
+  async function handleDailyReport() {
+    setReportError(null);
+    setIsGeneratingReport(true);
+    try {
+      const { data } = await supabaseBrowser.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        setReportError('Session expirée — reconnectez-vous puis réessayez.');
+        return;
+      }
+
+      const res = await fetch('/api/orders/daily-report', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        setReportError("Impossible de générer le récapitulatif du jour.");
+        return;
+      }
+
+      const blob = await res.blob();
+      const disposition = res.headers.get('content-disposition') ?? '';
+      const match = disposition.match(/filename="([^"]+)"/);
+      const filename = match?.[1] ?? 'recap-sos-caffe.pdf';
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setReportError("Impossible de générer le récapitulatif du jour.");
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  }
+
   if (session === undefined) {
     return <div className="p-6 text-center text-ink/60">Chargement…</div>;
   }
@@ -179,10 +220,21 @@ export default function KitchenPage() {
     <div className="mx-auto max-w-2xl px-4 pb-24 pt-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-display text-2xl text-forest">Commandes</h1>
-        <button onClick={handleLogout} className="text-sm text-ink/60 underline">
-          Déconnexion
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleDailyReport}
+            disabled={isGeneratingReport}
+            className="rounded-lg border border-espresso/30 px-3 py-1.5 text-sm font-medium text-espresso disabled:opacity-50"
+          >
+            {isGeneratingReport ? 'Génération…' : '📄 Récap du jour'}
+          </button>
+          <button onClick={handleLogout} className="text-sm text-ink/60 underline">
+            Déconnexion
+          </button>
+        </div>
       </div>
+
+      {reportError && <p className="mb-4 text-sm text-red-600">{reportError}</p>}
 
       {newOrderAlert && (
         <div className="mb-4 flex items-center justify-between rounded-xl border border-gold bg-gold/15 px-4 py-3">
