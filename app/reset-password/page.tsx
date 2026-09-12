@@ -33,18 +33,18 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError(null);
     if (password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères.');
+      setError('Password must be at least 6 characters long.');
       return;
     }
     if (password !== confirmPassword) {
-      setError('Les deux mots de passe ne correspondent pas.');
+      setError('The two passwords do not match.');
       return;
     }
     setLoading(true);
     const { error } = await supabaseBrowser.auth.updateUser({ password });
     setLoading(false);
     if (error) {
-      setError("La mise à jour a échoué. Redemande un nouveau lien depuis la page de connexion.");
+      setError('The update failed. Request a new link from the login page.');
       return;
     }
     setSuccess(true);
@@ -52,21 +52,21 @@ export default function ResetPasswordPage() {
   }
 
   if (checking) {
-    return <div className="p-6 text-center text-ink/60">Vérification du lien…</div>;
+    return <div className="p-6 text-center text-ink/60">Verifying link…</div>;
   }
 
   if (!ready) {
     return (
       <div className="mx-auto flex min-h-[70vh] max-w-sm flex-col justify-center px-4 text-center">
-        <h1 className="mb-3 font-display text-2xl text-forest">Lien invalide ou expiré</h1>
+        <h1 className="mb-3 font-display text-2xl text-forest">Invalid or expired link</h1>
         <p className="mb-6 text-sm text-ink/70">
-          Redemande un nouveau lien de réinitialisation depuis la page de connexion.
+          Request a new reset link from the login page.
         </p>
         <button
           onClick={() => router.push('/login')}
           className="rounded-lg bg-forest px-4 py-3 font-medium text-cream"
         >
-          Retour à la connexion
+          Back to login
         </button>
       </div>
     );
@@ -74,15 +74,15 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-sm flex-col justify-center px-4">
-      <h1 className="mb-1 font-display text-2xl text-forest">Nouveau mot de passe</h1>
-      <p className="mb-6 text-sm text-ink/60">Choisis un nouveau mot de passe pour ton compte staff.</p>
+      <h1 className="mb-1 font-display text-2xl text-forest">New password</h1>
+      <p className="mb-6 text-sm text-ink/60">Choose a new password for your staff account.</p>
 
       {success ? (
-        <p className="text-sm text-forest">Mot de passe mis à jour. Redirection…</p>
+        <p className="text-sm text-forest">Password updated. Redirecting…</p>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label className="mb-1 block text-sm text-ink/70">Nouveau mot de passe</label>
+            <label className="mb-1 block text-sm text-ink/70">New password</label>
             <input
               type="password"
               required
@@ -93,7 +93,7 @@ export default function ResetPasswordPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm text-ink/70">Confirme le mot de passe</label>
+            <label className="mb-1 block text-sm text-ink/70">Confirm password</label>
             <input
               type="password"
               required
@@ -109,7 +109,7 @@ export default function ResetPasswordPage() {
             disabled={loading}
             className="mt-2 rounded-lg bg-forest px-4 py-3 font-medium text-cream disabled:opacity-60"
           >
-            {loading ? 'Enregistrement…' : 'Enregistrer le mot de passe'}
+            {loading ? 'Saving…' : 'Save password'}
           </button>
         </form>
       )}
