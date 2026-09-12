@@ -28,10 +28,16 @@ function getNairobiDayRangeUtc(now: Date) {
   };
 }
 
+interface DailyReportModifier {
+  name: string;
+  price: number;
+}
+
 interface DailyReportOrderItem {
   quantity: number;
   size: 'single' | 'double' | null;
   menu_items: { name: string } | null;
+  order_item_modifiers: { modifiers: DailyReportModifier | null }[];
 }
 
 interface DailyReportOrder {
@@ -62,7 +68,7 @@ export async function GET(req: NextRequest) {
   const { data: orders, error } = await supabaseServer
     .from('orders')
     .select(
-      'id, order_number, total_amount, customer_name, created_at, order_items(quantity, size, menu_items(name))'
+      'id, order_number, total_amount, customer_name, created_at, order_items(quantity, size, menu_items(name), order_item_modifiers(modifiers(name, price)))'
     )
     .gte('created_at', startUtc.toISOString())
     .lt('created_at', endUtc.toISOString())
@@ -101,20 +107,41 @@ export async function GET(req: NextRequest) {
         hour12: false,
         timeZone: 'Africa/Nairobi',
       });
-      const itemsLine =
-        (o.order_items ?? [])
-          .map((it) => {
-            const sizeLabel = it.size ? ` (${it.size === 'single' ? 'single' : 'double'})` : '';
-            return `${it.quantity}× ${it.menu_items?.name ?? 'Item'}${sizeLabel}`;
-          })
-          .join(', ') || '—';
-
       doc
         .fontSize(11)
         .font('Helvetica-Bold')
         .text(`#${o.order_number} — ${time} — ${o.customer_name ?? 'Customer'}`);
-      doc.fontSize(10).font('Helvetica').text(itemsLine);
-      doc.text(`Amount: ${formatKsh(o.total_amount)}`);
+
+      const items = o.order_items ?? [];
+      if (items.length === 0) {
+        doc.fontSize(10).font('Helvetica').text('—');
+      } else {
+        items.forEach((it) => {
+          const sizeLabel = it.size ? ` (${it.size === 'single' ? 'single' : 'double'})` : '';
+          doc
+            .fontSize(10)
+            .font('Helvetica')
+            .fillColor('#000000')
+            .text(`${it.quantity}× ${it.menu_items?.name ?? 'Item'}${sizeLabel}`);
+
+          const mods = (it.order_item_modifiers ?? [])
+            .map((m) => m.modifiers)
+            .filter((m): m is DailyReportModifier => !!m);
+          if (mods.length > 0) {
+            const modsLine = mods
+              .map((m) => (m.price > 0 ? `${m.name} (+${formatKsh(m.price)})` : m.name))
+              .join(', ');
+            doc
+              .fontSize(9)
+              .font('Helvetica-Oblique')
+              .fillColor('#555555')
+              .text(`+ ${modsLine}`, { indent: 14 });
+            doc.fillColor('#000000');
+          }
+        });
+      }
+
+      doc.fontSize(10).font('Helvetica').text(`Amount: ${formatKsh(o.total_amount)}`);
       doc.moveDown(0.6);
     });
   }
