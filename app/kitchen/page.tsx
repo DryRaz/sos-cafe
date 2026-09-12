@@ -34,16 +34,16 @@ interface KitchenMenuItem {
 }
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
-  paid: 'Nouvelle',
-  preparing: 'En préparation',
-  ready: 'Prête',
-  completed: 'Terminée',
+  paid: 'New',
+  preparing: 'Preparing',
+  ready: 'Ready',
+  completed: 'Completed',
 };
 
 const NEXT_ACTION: Partial<Record<OrderStatus, { label: string; next: OrderStatus }>> = {
-  paid: { label: 'Commencer la préparation', next: 'preparing' },
-  preparing: { label: 'Marquer prête', next: 'ready' },
-  ready: { label: 'Marquer servie', next: 'completed' },
+  paid: { label: 'Start preparing', next: 'preparing' },
+  preparing: { label: 'Mark ready', next: 'ready' },
+  ready: { label: 'Mark served', next: 'completed' },
 };
 
 export default function KitchenPage() {
@@ -106,7 +106,7 @@ export default function KitchenPage() {
     playNewOrderChime();
     vibrate([150, 80, 150, 80, 150]);
     if (document.hidden) {
-      document.title = `🔔 Nouvelle commande — ${originalTitleRef.current}`;
+      document.title = `🔔 New order — ${originalTitleRef.current}`;
     }
     setNewOrderAlert({ orderId, orderNumber });
     if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
@@ -177,7 +177,7 @@ export default function KitchenPage() {
       const { data } = await supabaseBrowser.auth.getSession();
       const token = data.session?.access_token;
       if (!token) {
-        setReportError('Session expirée — reconnectez-vous puis réessayez.');
+        setReportError('Session expired — log in again and retry.');
         return;
       }
 
@@ -185,7 +185,7 @@ export default function KitchenPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
-        setReportError("Impossible de générer le récapitulatif du jour.");
+        setReportError('Unable to generate the daily recap.');
         return;
       }
 
@@ -203,14 +203,14 @@ export default function KitchenPage() {
       link.remove();
       URL.revokeObjectURL(url);
     } catch {
-      setReportError("Impossible de générer le récapitulatif du jour.");
+      setReportError('Unable to generate the daily recap.');
     } finally {
       setIsGeneratingReport(false);
     }
   }
 
   if (session === undefined) {
-    return <div className="p-6 text-center text-ink/60">Chargement…</div>;
+    return <div className="p-6 text-center text-ink/60">Loading…</div>;
   }
   if (!session) {
     return null;
@@ -219,17 +219,17 @@ export default function KitchenPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 pb-24 pt-6">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="font-display text-2xl text-forest">Commandes</h1>
+        <h1 className="font-display text-2xl text-forest">Orders</h1>
         <div className="flex items-center gap-3">
           <button
             onClick={handleDailyReport}
             disabled={isGeneratingReport}
             className="rounded-lg border border-espresso/30 px-3 py-1.5 text-sm font-medium text-espresso disabled:opacity-50"
           >
-            {isGeneratingReport ? 'Génération…' : '📄 Récap du jour'}
+            {isGeneratingReport ? 'Generating…' : '📄 Daily recap'}
           </button>
           <button onClick={handleLogout} className="text-sm text-ink/60 underline">
-            Déconnexion
+            Log out
           </button>
         </div>
       </div>
@@ -239,7 +239,7 @@ export default function KitchenPage() {
       {newOrderAlert && (
         <div className="mb-4 flex items-center justify-between rounded-xl border border-gold bg-gold/15 px-4 py-3">
           <p className="font-display text-base text-espresso">
-            🔔 Nouvelle commande #{newOrderAlert.orderNumber} !
+            🔔 New order #{newOrderAlert.orderNumber}!
           </p>
           <button
             onClick={() => setNewOrderAlert(null)}
@@ -253,7 +253,7 @@ export default function KitchenPage() {
       {loadError && <p className="mb-4 text-sm text-red-600">{loadError}</p>}
 
       {orders.length === 0 && (
-        <p className="text-ink/60">Aucune commande en cours pour le moment.</p>
+        <p className="text-ink/60">No orders in progress right now.</p>
       )}
 
       <div className="flex flex-col gap-4">
@@ -270,20 +270,20 @@ export default function KitchenPage() {
             >
               <div className="mb-2 flex items-center justify-between">
                 <span className="font-display text-lg text-forest">
-                  Commande #{order.order_number}
+                  Order #{order.order_number}
                 </span>
                 <span className="rounded-full bg-cream px-3 py-1 text-xs font-medium text-espresso">
                   {STATUS_LABEL[order.status]}
                 </span>
               </div>
               {order.customer_name && (
-                <p className="mb-2 text-sm text-ink/70">Client : {order.customer_name}</p>
+                <p className="mb-2 text-sm text-ink/70">Customer: {order.customer_name}</p>
               )}
               <ul className="mb-3 flex flex-col gap-1 text-sm text-ink">
                 {order.order_items.map((line) => (
                   <li key={line.id}>
-                    {line.quantity}× {line.menu_items?.name ?? 'Article'}
-                    {line.size ? ` (${line.size === 'single' ? 'simple' : 'double'})` : ''}
+                    {line.quantity}× {line.menu_items?.name ?? 'Item'}
+                    {line.size ? ` (${line.size === 'single' ? 'single' : 'double'})` : ''}
                     {line.notes ? ` — ${line.notes}` : ''}
                   </li>
                 ))}
@@ -304,7 +304,7 @@ export default function KitchenPage() {
         })}
       </div>
 
-      <h2 className="mb-3 mt-10 font-display text-xl text-forest">Disponibilité du menu</h2>
+      <h2 className="mb-3 mt-10 font-display text-xl text-forest">Menu availability</h2>
       <div className="flex flex-col divide-y divide-ink/10 rounded-xl border border-ink/10 bg-white">
         {menuItems.map((item) => (
           <label key={item.id} className="flex items-center justify-between px-4 py-3">
