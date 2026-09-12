@@ -20,7 +20,7 @@ export default function LoginPage() {
     const { error } = await supabaseBrowser.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) {
-      setError('Email ou mot de passe incorrect.');
+      setError('Incorrect email or password.');
       return;
     }
     router.push('/kitchen');
@@ -36,16 +36,16 @@ export default function LoginPage() {
     });
     setLoading(false);
     if (error) {
-      setError("Impossible d'envoyer l'email. Vérifie l'adresse et réessaie.");
+      setError('Unable to send the email. Check the address and try again.');
       return;
     }
-    setInfo('Si un compte existe avec cet email, un lien de réinitialisation vient de lui être envoyé.');
+    setInfo('If an account exists with this email, a reset link has just been sent to it.');
   }
 
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-sm flex-col justify-center px-4">
-      <h1 className="mb-1 font-display text-2xl text-forest">Espace staff</h1>
-      <p className="mb-6 text-sm text-ink/60">SOS Caffè — connexion cuisine / admin</p>
+      <h1 className="mb-1 font-display text-2xl text-forest">Staff area</h1>
+      <p className="mb-6 text-sm text-ink/60">SOS Caffè — kitchen / admin login</p>
 
       {mode === 'login' ? (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -61,7 +61,7 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm text-ink/70">Mot de passe</label>
+            <label className="mb-1 block text-sm text-ink/70">Password</label>
             <input
               type="password"
               required
@@ -77,7 +77,7 @@ export default function LoginPage() {
             disabled={loading}
             className="mt-2 rounded-lg bg-forest px-4 py-3 font-medium text-cream disabled:opacity-60"
           >
-            {loading ? 'Connexion…' : 'Se connecter'}
+            {loading ? 'Signing in…' : 'Sign in'}
           </button>
           <button
             type="button"
@@ -88,7 +88,7 @@ export default function LoginPage() {
             }}
             className="text-sm text-ink/60 underline"
           >
-            Mot de passe oublié ?
+            Forgot your password?
           </button>
         </form>
       ) : (
@@ -111,7 +111,7 @@ export default function LoginPage() {
             disabled={loading}
             className="mt-2 rounded-lg bg-forest px-4 py-3 font-medium text-cream disabled:opacity-60"
           >
-            {loading ? 'Envoi…' : 'Envoyer le lien de réinitialisation'}
+            {loading ? 'Sending…' : 'Send reset link'}
           </button>
           <button
             type="button"
@@ -122,7 +122,7 @@ export default function LoginPage() {
             }}
             className="text-sm text-ink/60 underline"
           >
-            Retour à la connexion
+            Back to login
           </button>
         </form>
       )}
