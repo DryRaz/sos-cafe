@@ -72,6 +72,10 @@ export async function GET(req: NextRequest) {
     )
     .gte('created_at', startUtc.toISOString())
     .lt('created_at', endUtc.toISOString())
+    // Only orders that actually completed payment count toward the day's
+    // revenue — carts abandoned before paying, and M-Pesa prompts that
+    // failed/expired/were never answered, must not inflate the recap.
+    .in('status', ['paid', 'preparing', 'ready', 'completed'])
     .order('created_at', { ascending: true });
 
   if (error) {
