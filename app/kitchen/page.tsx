@@ -40,10 +40,13 @@ interface KitchenMenuItem {
 }
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
+  awaiting_payment: 'Awaiting payment',
   paid: 'New',
   preparing: 'Preparing',
   ready: 'Ready',
   completed: 'Completed',
+  failed: 'Payment failed',
+  expired: 'Payment expired',
 };
 
 const NEXT_ACTION: Partial<Record<OrderStatus, { label: string; next: OrderStatus }>> = {

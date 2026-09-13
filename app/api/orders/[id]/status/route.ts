@@ -12,7 +12,7 @@ export const revalidate = 0;
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const { data, error } = await supabaseServer
     .from('orders')
-    .select('status')
+    .select('status, payment_failure_reason')
     .eq('id', params.id)
     .single();
 
@@ -20,5 +20,5 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Order not found.' }, { status: 404 });
   }
 
-  return NextResponse.json({ status: data.status });
+  return NextResponse.json({ status: data.status, payment_failure_reason: data.payment_failure_reason });
 }
