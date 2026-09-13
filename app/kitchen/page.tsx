@@ -8,12 +8,18 @@ import { formatKsh } from '@/lib/format';
 import { playNewOrderChime, vibrate } from '@/lib/notify';
 import type { OrderStatus } from '@/lib/types';
 
+interface KitchenModifier {
+  name: string;
+  price: number;
+}
+
 interface KitchenOrderItem {
   id: string;
   quantity: number;
   size: 'single' | 'double' | null;
   notes: string | null;
   menu_items: { name: string } | null;
+  order_item_modifiers: { modifiers: KitchenModifier | null }[];
 }
 
 interface KitchenOrder {
@@ -64,7 +70,7 @@ export default function KitchenPage() {
     const { data, error } = await supabaseBrowser
       .from('orders')
       .select(
-        'id, order_number, status, total_amount, customer_name, customer_phone, created_at, order_items(id, quantity, size, notes, menu_items(name))'
+        'id, order_number, status, total_amount, customer_name, customer_phone, created_at, order_items(id, quantity, size, notes, menu_items(name), order_item_modifiers(modifiers(name, price)))'
       )
       .in('status', ['paid', 'preparing', 'ready'])
       .order('created_at', { ascending: true });
@@ -279,14 +285,29 @@ export default function KitchenPage() {
               {order.customer_name && (
                 <p className="mb-2 text-sm text-ink/70">Customer: {order.customer_name}</p>
               )}
-              <ul className="mb-3 flex flex-col gap-1 text-sm text-ink">
-                {order.order_items.map((line) => (
-                  <li key={line.id}>
-                    {line.quantity}× {line.menu_items?.name ?? 'Item'}
-                    {line.size ? ` (${line.size === 'single' ? 'single' : 'double'})` : ''}
-                    {line.notes ? ` — ${line.notes}` : ''}
-                  </li>
-                ))}
+              <ul className="mb-3 flex flex-col gap-1.5 text-sm text-ink">
+                {order.order_items.map((line) => {
+                  const mods = (line.order_item_modifiers ?? [])
+                    .map((m) => m.modifiers)
+                    .filter((m): m is KitchenModifier => !!m);
+                  return (
+                    <li key={line.id}>
+                      <p>
+                        {line.quantity}× {line.menu_items?.name ?? 'Item'}
+                        {line.size ? ` (${line.size === 'single' ? 'single' : 'double'})` : ''}
+                        {line.notes ? ` — ${line.notes}` : ''}
+                      </p>
+                      {mods.length > 0 && (
+                        <p className="ml-4 font-medium text-forest">
+                          +{' '}
+                          {mods
+                            .map((m) => (m.price > 0 ? `${m.name} (+${formatKsh(m.price)})` : m.name))
+                            .join(', ')}
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-ink">{formatKsh(order.total_amount)}</span>
