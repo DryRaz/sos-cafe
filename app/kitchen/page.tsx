@@ -29,6 +29,7 @@ interface KitchenOrder {
   total_amount: number;
   customer_name: string | null;
   customer_phone: string | null;
+  mpesa_receipt_number: string | null;
   created_at: string;
   order_items: KitchenOrderItem[];
 }
@@ -73,7 +74,7 @@ export default function KitchenPage() {
     const { data, error } = await supabaseBrowser
       .from('orders')
       .select(
-        'id, order_number, status, total_amount, customer_name, customer_phone, created_at, order_items(id, quantity, size, notes, menu_items(name), order_item_modifiers(modifiers(name, price)))'
+        'id, order_number, status, total_amount, customer_name, customer_phone, mpesa_receipt_number, created_at, order_items(id, quantity, size, notes, menu_items(name), order_item_modifiers(modifiers(name, price)))'
       )
       .in('status', ['paid', 'preparing', 'ready'])
       .order('created_at', { ascending: true });
@@ -139,14 +140,17 @@ export default function KitchenPage() {
 
     const channel = supabaseBrowser
       .channel('kitchen-dashboard')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => loadOrders())
+      // Orders are created unpaid and only reach the kitchen once the customer
+      // submits their M-Pesa code, which flips them to "paid" — that update is
+      // the real "new order" moment.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
         loadOrders();
-        const newOrder = payload.new as { id?: string; order_number?: number } | null;
-        if (newOrder?.id && newOrder.order_number) {
-          notifyNewOrder(newOrder.id, newOrder.order_number);
+        const updated = payload.new as { id?: string; order_number?: number; status?: string } | null;
+        if (updated?.status === 'paid' && updated.id && updated.order_number) {
+          notifyNewOrder(updated.id, updated.order_number);
         }
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadOrders())
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, () => loadOrders())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => loadOrders())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, () => loadMenuItems())
@@ -287,6 +291,19 @@ export default function KitchenPage() {
               </div>
               {order.customer_name && (
                 <p className="mb-2 text-sm text-ink/70">Customer: {order.customer_name}</p>
+              )}
+              {order.mpesa_receipt_number && (
+                <p className="mb-2 rounded-lg bg-gold/15 px-3 py-2 text-sm text-espresso">
+                  M-Pesa code:{' '}
+                  <span className="font-mono font-bold tracking-wider text-ink">
+                    {order.mpesa_receipt_number}
+                  </span>
+                  {order.status === 'paid' && (
+                    <span className="block text-xs text-espresso/70">
+                      Check it matches the Till SMS ({formatKsh(order.total_amount)}) before preparing.
+                    </span>
+                  )}
+                </p>
               )}
               <ul className="mb-3 flex flex-col gap-1.5 text-sm text-ink">
                 {order.order_items.map((line) => {

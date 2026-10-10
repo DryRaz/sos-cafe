@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase-server';
-import { initiateStkPush } from '@/lib/mpesa';
 
 interface OrderItemInput {
   menu_item_id: string;
@@ -99,37 +98,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Trigger the M-Pesa prompt now that the order and its items are safely
-  // recorded. If Daraja rejects the request outright (bad phone, Safaricom
-  // outage, misconfigured shortcode, ...) fail the order immediately rather
-  // than leaving it stuck in "awaiting_payment" forever with no prompt ever
-  // sent — the customer can then retry from the order page.
-  const callbackUrl = process.env.MPESA_CALLBACK_URL || `${req.nextUrl.origin}/api/mpesa/callback`;
-  try {
-    const stk = await initiateStkPush({
-      phone: body.phone,
-      amount: totalAmount,
-      accountReference: `SOS Caffe #${order.order_number}`,
-      transactionDesc: `SOS Caffe order #${order.order_number}`,
-      callbackUrl,
-    });
-    await supabaseServer
-      .from('orders')
-      .update({
-        mpesa_checkout_request_id: stk.checkoutRequestId,
-        mpesa_merchant_request_id: stk.merchantRequestId,
-      })
-      .eq('id', order.id);
-  } catch (err) {
-    await supabaseServer
-      .from('orders')
-      .update({
-        status: 'failed',
-        payment_failure_reason:
-          err instanceof Error ? err.message : 'Could not reach M-Pesa. Please try again.',
-      })
-      .eq('id', order.id);
-  }
-
+  // No payment is triggered from here: the order stays in "awaiting_payment"
+  // until the customer pays the Till from their M-Pesa app and submits the
+  // confirmation code (see /api/orders/[id]/confirm-payment).
   return NextResponse.json({ id: order.id, order_number: order.order_number });
 }

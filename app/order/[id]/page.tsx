@@ -30,7 +30,12 @@ export default async function OrderConfirmationPage({ params }: { params: { id: 
       <p className="mt-2 text-espresso">
         Order <span className="font-display text-2xl text-ink">#{order.order_number}</span>
       </p>
-      <OrderStatusBanner orderId={order.id} initialStatus={order.status as OrderStatus}>
+      <OrderStatusBanner
+        orderId={order.id}
+        initialStatus={order.status as OrderStatus}
+        totalAmount={order.total_amount}
+        tillNumber={process.env.MPESA_TILL_NUMBER?.trim() || null}
+      >
         <div className="mt-6 space-y-3 rounded-xl border border-espresso/15 bg-white p-4 text-left">
           {(items ?? []).map((item: any) => {
             const mods = (item.order_item_modifiers ?? [])
