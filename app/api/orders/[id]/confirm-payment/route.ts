@@ -44,7 +44,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'This order has already been paid.' }, { status: 409 });
   }
 
-  // One M-Pesa payment can only ever pay for one order.
+  // One M-Pesa payment can only ever pay for one order. The unique index on
+  // orders.mpesa_receipt_number enforces it; this check just answers early.
   const { data: reused } = await supabaseServer
     .from('orders')
     .select('id')
@@ -69,6 +70,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .select('id');
 
   if (updateError) {
+    // 23505 = unique_violation on orders.mpesa_receipt_number: another order
+    // claimed this code between the check above and this update.
+    if (updateError.code === '23505') {
+      return NextResponse.json(
+        { error: 'This M-Pesa code has already been used for another order.' },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: 'Could not save your payment. Please try again.' }, { status: 500 });
   }
   if (!updated || updated.length === 0) {
