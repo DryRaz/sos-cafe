@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { MouseEvent, ReactNode } from 'react';
+import type { FormEvent, MouseEvent, ReactNode } from 'react';
 import type { OrderStatus } from '@/lib/types';
 import { playReadyChime, vibrate } from '@/lib/notify';
+import { formatKsh } from '@/lib/format';
 
 const STATUS_COPY: Record<OrderStatus, { title: string; subtitle: string }> = {
   awaiting_payment: {
-    title: 'Check your phone 📱',
-    subtitle: 'Enter your M-Pesa PIN on the prompt to confirm payment.',
+    title: 'Waiting for payment',
+    subtitle: 'Pay with M-Pesa and enter your confirmation code to send your order to the kitchen.',
   },
   paid: {
     title: 'Order received',
@@ -28,11 +29,11 @@ const STATUS_COPY: Record<OrderStatus, { title: string; subtitle: string }> = {
   },
   failed: {
     title: 'Payment not completed',
-    subtitle: 'Your order was not charged — you can try again below.',
+    subtitle: 'Pay with M-Pesa and enter your confirmation code to send your order to the kitchen.',
   },
   expired: {
-    title: 'Payment prompt expired',
-    subtitle: "You didn't respond in time — you can try again below.",
+    title: 'Payment not completed',
+    subtitle: 'Pay with M-Pesa and enter your confirmation code to send your order to the kitchen.',
   },
 };
 
@@ -41,16 +42,22 @@ const PENDING_STATUSES: OrderStatus[] = ['awaiting_payment', 'paid', 'preparing'
 export default function OrderStatusBanner({
   orderId,
   initialStatus,
+  totalAmount,
+  tillNumber,
   children,
 }: {
   orderId: string;
   initialStatus: OrderStatus;
+  totalAmount: number;
+  tillNumber: string | null;
   children?: ReactNode;
 }) {
   const [status, setStatus] = useState<OrderStatus>(initialStatus);
-  const [failureReason, setFailureReason] = useState<string | null>(null);
-  const [retrying, setRetrying] = useState(false);
-  const [retryError, setRetryError] = useState<string | null>(null);
+  const [paymentOpen, setPaymentOpen] = useState(true);
+  const [code, setCode] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [tillCopied, setTillCopied] = useState(false);
   const prevStatusRef = useRef<OrderStatus>(initialStatus);
   const originalTitleRef = useRef<string>('');
 
@@ -72,7 +79,6 @@ export default function OrderStatusBanner({
         const data = await res.json();
         if (data.status && data.status !== status) {
           setStatus(data.status as OrderStatus);
-          setFailureReason(data.payment_failure_reason ?? null);
         }
       } catch {
         // Network hiccup — just try again on the next tick.
@@ -95,25 +101,40 @@ export default function OrderStatusBanner({
   }, [status]);
 
   const isActive = PENDING_STATUSES.includes(status);
-  const canRetry = status === 'failed' || status === 'expired';
+  const needsPayment = status === 'awaiting_payment' || status === 'failed' || status === 'expired';
 
-  async function handleRetry() {
-    setRetrying(true);
-    setRetryError(null);
+  async function handleConfirmPayment(e: FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setSubmitError(null);
     try {
-      const res = await fetch(`/api/orders/${orderId}/retry-payment`, { method: 'POST' });
+      const res = await fetch(`/api/orders/${orderId}/confirm-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.error ?? 'Could not send the payment prompt. Please try again.');
+        throw new Error(errBody.error ?? 'Could not confirm your payment. Please try again.');
       }
-      setStatus('awaiting_payment');
-      setFailureReason(null);
+      setStatus('paid');
     } catch (err) {
-      setRetryError(
-        err instanceof Error ? err.message : 'Could not send the payment prompt. Please try again.'
+      setSubmitError(
+        err instanceof Error ? err.message : 'Could not confirm your payment. Please try again.'
       );
     } finally {
-      setRetrying(false);
+      setSubmitting(false);
+    }
+  }
+
+  async function handleCopyTill() {
+    if (!tillNumber) return;
+    try {
+      await navigator.clipboard.writeText(tillNumber);
+      setTillCopied(true);
+      setTimeout(() => setTillCopied(false), 2000);
+    } catch {
+      // Clipboard blocked — the number is on screen to type in by hand.
     }
   }
 
@@ -154,19 +175,88 @@ export default function OrderStatusBanner({
         <p className={`mt-1 text-sm ${isReady ? 'text-cream/90' : 'text-espresso/70'}`}>
           {copy.subtitle}
         </p>
-        {failureReason && (canRetry) && <p className="mt-1 text-xs text-espresso/50">{failureReason}</p>}
       </div>
 
-      {canRetry && (
-        <div className="mt-3 rounded-xl border border-espresso/15 bg-white p-4 text-left">
-          <button
-            onClick={handleRetry}
-            disabled={retrying}
-            className="w-full rounded-full bg-forest py-3 font-medium text-cream disabled:opacity-60"
+      {needsPayment && !paymentOpen && (
+        <button
+          onClick={() => setPaymentOpen(true)}
+          className="mt-3 w-full rounded-full bg-forest py-3 font-medium text-cream"
+        >
+          Pay with M-Pesa
+        </button>
+      )}
+
+      {needsPayment && paymentOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/60 px-4 pb-4 sm:items-center">
+          <form
+            onSubmit={handleConfirmPayment}
+            className="w-full max-w-md rounded-2xl bg-cream p-5 text-left shadow-xl"
           >
-            {retrying ? 'Sending prompt…' : 'Try payment again'}
-          </button>
-          {retryError && <p className="mt-2 text-sm text-red-700">{retryError}</p>}
+            <p className="font-display text-xl text-forest">Pay with M-Pesa</p>
+            <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-espresso">
+              <li>Open M-Pesa on your phone</li>
+              <li>
+                Go to <strong>Lipa na M-Pesa</strong> → <strong>Buy Goods and Services</strong>
+              </li>
+              <li>Enter the Till number and amount below, then your PIN</li>
+              <li>Copy the confirmation code from the M-Pesa SMS and paste it here</li>
+            </ol>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-espresso/15 bg-white p-3">
+                <p className="text-xs text-espresso/70">Till number</p>
+                {tillNumber ? (
+                  <button
+                    type="button"
+                    onClick={handleCopyTill}
+                    className="mt-0.5 font-display text-2xl tracking-wider text-ink"
+                  >
+                    {tillNumber}
+                  </button>
+                ) : (
+                  <p className="mt-0.5 text-sm text-ink">Ask at the counter</p>
+                )}
+                {tillNumber && (
+                  <p className="text-xs text-forest">{tillCopied ? 'Copied!' : 'Tap to copy'}</p>
+                )}
+              </div>
+              <div className="rounded-xl border border-espresso/15 bg-white p-3">
+                <p className="text-xs text-espresso/70">Amount</p>
+                <p className="mt-0.5 font-display text-2xl text-ink">{formatKsh(totalAmount)}</p>
+              </div>
+            </div>
+
+            <label className="mt-4 block text-sm text-espresso" htmlFor="mpesa-code">
+              M-Pesa confirmation code
+            </label>
+            <input
+              id="mpesa-code"
+              type="text"
+              autoComplete="off"
+              autoCapitalize="characters"
+              placeholder="e.g. SJK3ABC12D"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-espresso/20 bg-white px-4 py-3 uppercase tracking-wider text-ink"
+              required
+            />
+            {submitError && <p className="mt-2 text-sm text-red-700">{submitError}</p>}
+
+            <button
+              type="submit"
+              disabled={submitting || code.trim().length === 0}
+              className="mt-4 w-full rounded-full bg-forest py-3.5 font-medium text-cream disabled:opacity-60"
+            >
+              {submitting ? 'Confirming…' : 'Confirm payment'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaymentOpen(false)}
+              className="mt-2 w-full py-2 text-sm text-espresso/70 underline"
+            >
+              I&apos;ll do it in a moment
+            </button>
+          </form>
         </div>
       )}
 

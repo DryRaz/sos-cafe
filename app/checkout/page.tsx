@@ -62,7 +62,7 @@ export default function CheckoutPage() {
     <div className="min-h-screen bg-cream px-4 pb-10 pt-6">
       <h1 className="font-display text-2xl text-ink">Checkout</h1>
       <p className="mt-1 text-sm text-espresso/80">
-        You&apos;ll get an M-Pesa prompt on your phone to confirm payment.
+        After confirming, you&apos;ll pay our M-Pesa Till from your phone and enter the confirmation code.
       </p>
 
       <div className="mt-5 space-y-3">
@@ -134,7 +134,7 @@ export default function CheckoutPage() {
           disabled={submitting}
           className="w-full rounded-full bg-forest py-3.5 font-medium text-cream disabled:opacity-60"
         >
-          {submitting ? 'Sending M-Pesa prompt…' : 'Pay with M-Pesa'}
+          {submitting ? 'Placing order…' : 'Place order'}
         </button>
       </form>
     </div>
