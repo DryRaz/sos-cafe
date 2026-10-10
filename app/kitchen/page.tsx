@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Session } from '@supabase/supabase-js';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 import { formatKsh } from '@/lib/format';
 import { playNewOrderChime, vibrate } from '@/lib/notify';
 import type { OrderStatus } from '@/lib/types';
+import { nairobiToday } from '@/lib/nairobi';
 
 interface KitchenModifier {
   name: string;
@@ -37,7 +38,9 @@ interface KitchenOrder {
 interface KitchenMenuItem {
   id: string;
   name: string;
+  price_single: number;
   is_available: boolean;
+  available_on: string | null;
 }
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
@@ -67,6 +70,10 @@ export default function KitchenPage() {
   );
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [pastryName, setPastryName] = useState('');
+  const [pastryPrice, setPastryPrice] = useState('');
+  const [isAddingPastry, setIsAddingPastry] = useState(false);
+  const [pastryError, setPastryError] = useState<string | null>(null);
   const alertTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const originalTitleRef = useRef('');
 
@@ -90,7 +97,9 @@ export default function KitchenPage() {
   const loadMenuItems = useCallback(async () => {
     const { data, error } = await supabaseBrowser
       .from('menu_items')
-      .select('id, name, is_available')
+      .select('id, name, price_single, is_available, available_on')
+      // Pastries from previous days stay in the table for order history only.
+      .or(`available_on.is.null,available_on.eq.${nairobiToday()}`)
       .order('sort_order', { ascending: true });
     if (!error) setMenuItems((data ?? []) as KitchenMenuItem[]);
   }, []);
@@ -178,6 +187,51 @@ export default function KitchenPage() {
     if (error) loadMenuItems();
   }
 
+  async function staffFetch(url: string, init: RequestInit = {}) {
+    const { data } = await supabaseBrowser.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error('Session expired — log in again and retry.');
+    const res = await fetch(url, {
+      ...init,
+      headers: { ...init.headers, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error ?? 'Something went wrong. Please try again.');
+    }
+    return res.json();
+  }
+
+  async function handleAddPastry(e: FormEvent) {
+    e.preventDefault();
+    setPastryError(null);
+    setIsAddingPastry(true);
+    try {
+      await staffFetch('/api/kitchen/pastries', {
+        method: 'POST',
+        body: JSON.stringify({ name: pastryName, price: Number(pastryPrice) }),
+      });
+      setPastryName('');
+      setPastryPrice('');
+      loadMenuItems();
+    } catch (err) {
+      setPastryError(err instanceof Error ? err.message : 'Could not add the pastry.');
+    } finally {
+      setIsAddingPastry(false);
+    }
+  }
+
+  async function handleRemovePastry(item: KitchenMenuItem) {
+    if (!window.confirm(`Remove "${item.name}" from today's menu?`)) return;
+    setPastryError(null);
+    try {
+      await staffFetch(`/api/kitchen/pastries/${item.id}`, { method: 'DELETE' });
+      loadMenuItems();
+    } catch (err) {
+      setPastryError(err instanceof Error ? err.message : 'Could not remove the pastry.');
+    }
+  }
+
   async function handleLogout() {
     await supabaseBrowser.auth.signOut();
     router.replace('/login');
@@ -221,6 +275,9 @@ export default function KitchenPage() {
       setIsGeneratingReport(false);
     }
   }
+
+  const todaysPastries = menuItems.filter((m) => m.available_on !== null);
+  const permanentItems = menuItems.filter((m) => m.available_on === null);
 
   if (session === undefined) {
     return <div className="p-6 text-center text-ink/60">Loading…</div>;
@@ -345,9 +402,74 @@ export default function KitchenPage() {
         })}
       </div>
 
+      <h2 className="mb-1 mt-10 font-display text-xl text-forest">Today&apos;s pastries</h2>
+      <p className="mb-3 text-sm text-ink/60">
+        Add the pastries delivered this morning. They show on the customer menu today only.
+      </p>
+      <form onSubmit={handleAddPastry} className="mb-3 flex flex-wrap gap-2">
+        <input
+          type="text"
+          placeholder="Pastry name"
+          value={pastryName}
+          onChange={(e) => setPastryName(e.target.value)}
+          maxLength={60}
+          required
+          className="min-w-0 flex-[2_1_10rem] rounded-lg border border-ink/20 bg-white px-3 py-2 text-ink"
+        />
+        <input
+          type="number"
+          inputMode="numeric"
+          placeholder="Price (KSh)"
+          min={1}
+          step={1}
+          value={pastryPrice}
+          onChange={(e) => setPastryPrice(e.target.value)}
+          required
+          className="min-w-0 flex-[1_1_6rem] rounded-lg border border-ink/20 bg-white px-3 py-2 text-ink"
+        />
+        <button
+          type="submit"
+          disabled={isAddingPastry}
+          className="rounded-lg bg-forest px-4 py-2 text-sm font-medium text-cream disabled:opacity-60"
+        >
+          {isAddingPastry ? 'Adding…' : 'Add'}
+        </button>
+      </form>
+      {pastryError && <p className="mb-3 text-sm text-red-600">{pastryError}</p>}
+      {todaysPastries.length === 0 ? (
+        <p className="text-sm text-ink/60">No pastries added for today yet.</p>
+      ) : (
+        <div className="flex flex-col divide-y divide-ink/10 rounded-xl border border-ink/10 bg-white">
+          {todaysPastries.map((item) => (
+            <div key={item.id} className="flex items-center justify-between gap-3 px-4 py-3">
+              <span className={item.is_available ? 'text-ink' : 'text-ink/40 line-through'}>
+                {item.name} — {formatKsh(item.price_single)}
+              </span>
+              <div className="flex shrink-0 items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs text-ink/60">
+                  In stock
+                  <input
+                    type="checkbox"
+                    checked={item.is_available}
+                    onChange={() => toggleAvailability(item)}
+                    className="h-5 w-5 accent-forest"
+                  />
+                </label>
+                <button
+                  onClick={() => handleRemovePastry(item)}
+                  className="text-sm text-red-700 underline"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <h2 className="mb-3 mt-10 font-display text-xl text-forest">Menu availability</h2>
       <div className="flex flex-col divide-y divide-ink/10 rounded-xl border border-ink/10 bg-white">
-        {menuItems.map((item) => (
+        {permanentItems.map((item) => (
           <label key={item.id} className="flex items-center justify-between px-4 py-3">
             <span className={item.is_available ? 'text-ink' : 'text-ink/40 line-through'}>
               {item.name}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase-server';
+import { nairobiToday } from '@/lib/nairobi';
 
 interface OrderItemInput {
   menu_item_id: string;
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
 
   const { data: menuItems, error: menuError } = await supabaseServer
     .from('menu_items')
-    .select('id, price_single, price_double, is_available')
+    .select('id, price_single, price_double, is_available, available_on')
     .in('id', menuItemIds);
 
   if (menuError || !menuItems) {
@@ -32,9 +33,11 @@ export async function POST(req: NextRequest) {
 
   const menuById = new Map(menuItems.map((m) => [m.id, m]));
 
+  // A daily item (pastry) left in a cart from a previous day is no longer on sale.
+  const today = nairobiToday();
   const unavailable = items.find((i) => {
     const m = menuById.get(i.menu_item_id);
-    return !m || !m.is_available;
+    return !m || !m.is_available || (m.available_on !== null && m.available_on !== today);
   });
   if (unavailable) {
     return NextResponse.json(

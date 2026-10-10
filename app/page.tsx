@@ -1,6 +1,7 @@
 import { supabaseServer } from '@/lib/supabase-server';
 import MenuBrowser from '@/components/MenuBrowser';
 import type { MenuCategory } from '@/lib/types';
+import { nairobiToday } from '@/lib/nairobi';
 
 export const revalidate = 0;
 
@@ -16,6 +17,8 @@ async function getMenu(): Promise<MenuCategory[]> {
     .from('menu_items')
     .select('id, category_id, name, price_single, price_double, is_available, image_url, sort_order')
     .eq('is_available', true)
+    // Permanent items, plus the daily items (pastries) added for today.
+    .or(`available_on.is.null,available_on.eq.${nairobiToday()}`)
     .order('sort_order');
 
   const { data: itemModifierRows } = await supabaseServer
