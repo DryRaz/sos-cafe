@@ -123,7 +123,9 @@ export default function KitchenPage() {
 
   const notifyNewOrder = useCallback((orderId: string, orderNumber: number) => {
     playNewOrderChime();
-    vibrate([150, 80, 150, 80, 150]);
+    // Mirrors the three-burst audio alarm so a phone on silent/vibrate still
+    // gets the same "keep buzzing until you notice" treatment.
+    vibrate([150, 80, 150, 80, 150, 520, 150, 80, 150, 80, 150, 520, 150, 80, 150, 80, 150]);
     if (document.hidden) {
       document.title = `🔔 New order — ${originalTitleRef.current}`;
     }
