@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1F3B2E" />
+  <title>SOS Caffè — Offline</title>
+  <style>
+    html,body{height:100%;margin:0}
+    body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;
+      background:#F6F0E4;color:#2B2620;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;text-align:center}
+    .mark{width:72px;height:72px;border-radius:20px;background:#1F3B2E;display:flex;align-items:center;justify-content:center}
+    h1{margin:8px 0 0;font-size:22px;color:#1F3B2E}
+    p{margin:0;max-width:320px;line-height:1.5;color:#6B4A31}
+    button{margin-top:12px;border:0;border-radius:999px;background:#1F3B2E;color:#F6F0E4;
+      font-size:16px;font-weight:600;padding:14px 28px}
+  </style>
+</head>
+<body>
+  <div class="mark">
+    <svg width="44" height="44" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+      <path d="M20 4C11 4 5 11 5 20c0 9 6 16 15 16s15-7 15-16c0-3-1-6-2-8" stroke="#F6F0E4" stroke-width="2" stroke-linecap="round"/>
+      <path d="M13 22c2-6 8-9 14-8-1 6-6 10-12 10-1 0-1.5-1-2-2z" fill="#C49A45"/>
+    </svg>
+  </div>
+  <h1>You're offline</h1>
+  <p>Ordering is paused until your connection is back. Please check your signal or Wi-Fi and try again.</p>
+  <button onclick="location.reload()">Try again</button>
+</body>
+</html>

@@ -1,11 +1,25 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { CartProvider } from '@/components/CartProvider';
 import CartBar from '@/components/CartBar';
+import PWAProvider from '@/components/PWAProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'SOS Caffè — Kilgoris Coffee Spot',
   description: 'Order ahead at SOS Caffè, Kilgoris.',
+  applicationName: 'SOS Caffè',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [{ url: '/pwa-icon/192', type: 'image/png' }],
+    apple: [{ url: '/pwa-icon/apple', type: 'image/png' }],
+  },
+  appleWebApp: { capable: true, title: 'SOS Caffè', statusBarStyle: 'black-translucent' },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#1F3B2E',
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -30,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </div>
           </header>
+          <PWAProvider />
           {children}
           <CartBar />
         </CartProvider>
